@@ -286,6 +286,7 @@ select.fi2{cursor:pointer;}
       <div class="sec-hdr" onclick="togSec(this)">📢 নোটিশ ও উপহার <span style="margin-left:auto;color:var(--muted)">▼</span></div>
       <div class="sec-body">
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">এখানে নোটিশ যোগ করলে সব ইউজার হোম পেজে দেখতে পাবে।</div>
+        <a href="https://fty-notice-board.vercel.app/" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,#FF9500,#FF6B00);color:#fff;padding:12px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;margin-bottom:14px;">📢 Notice Board খোলো →</a>
         <div class="fg"><label class="fl">আইকন (Emoji)</label><input class="fi2" id="nIcon" placeholder="📢" value="📢"></div>
         <div class="fg"><label class="fl">শিরোনাম</label><input class="fi2" id="nTitle" placeholder="নোটিশের শিরোনাম..."></div>
         <div class="fg"><label class="fl">বিবরণ / নির্দেশনা</label><textarea class="fi2" id="nBody" placeholder="ইউজারদের জন্য নির্দেশনা লেখো..."></textarea></div>
@@ -638,49 +639,60 @@ function viewUser(uid){
 
 /* ── Support ── */
 var currentSupportUid = '';
+
 async function loadSupportMsgs(){
   $('supportList').innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px;">লোড হচ্ছে...</div>';
   try{
-    // সরাসরি settings collection query করো — support_ দিয়ে শুরু
-    var r = await fetch(FS+"settings?pageSize=100", {headers:fsh()});
+    // settings collection এ সব document দেখো
+    var r = await fetch(FSURL+"settings", {headers:fsh()});
     var d = await r.json();
-    var docs = (d.documents||[]);
-    var supportItems = [];
+    var docs = d.documents || [];
+    var items = [];
     for(var doc of docs){
-      var name = doc.name||'';
-      if(name.includes('support_')){
+      // document name এ support_ আছে কিনা
+      if(doc.name && doc.name.includes('/support_')){
         var data = fF(doc);
         if(data && data.lastMsg){
-          supportItems.push({
-            uid: data.uid||'', 
-            name: data.name||'—', 
-            email: data.email||'—', 
-            lastMsg: data.lastMsg, 
-            lastTime: data.lastTime, 
-            replied: data.replied, 
-            msgs: []
+          // msgs parse
+          var msgs = [];
+          if(data.msgs){
+            try{ msgs = typeof data.msgs==='string' ? JSON.parse(data.msgs) : data.msgs; }catch(e){ msgs=[]; }
+          }
+          items.push({
+            uid: data.uid||'',
+            name: data.name||'—',
+            email: data.email||'—',
+            lastMsg: data.lastMsg||'',
+            replied: data.replied||false,
+            msgs: msgs
           });
         }
       }
     }
-    if(!supportItems.length){
-      $('supportList').innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px;">কোনো বার্তা নেই</div>';
+    if(!items.length){
+      $('supportList').innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">কোনো বার্তা নেই</div>';
       return;
     }
-    supportItems.sort((a,b)=> (a.replied?1:0)-(b.replied?1:0));
-    var newCount = supportItems.filter(x=>!x.replied).length;
-    if(newCount>0){ $('supportBadge').textContent=newCount+' নতুন'; $('supportBadge').style.display='inline'; }
-    $('supportList').innerHTML = supportItems.map(s=>`
-      <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid ${s.replied?'var(--border)':'var(--p)'};">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-          <div style="font-weight:700;font-size:13px;flex:1;">${s.name||'—'}</div>
-          <span style="font-size:10px;background:${s.replied?'var(--bg2)':'rgba(255,45,85,.2)'};color:${s.replied?'var(--muted)':'var(--p)'};padding:2px 7px;border-radius:8px;">${s.replied?'✓ replied':'🔴 নতুন'}</span>
+    // unreplied আগে
+    items.sort((a,b)=>(a.replied?1:0)-(b.replied?1:0));
+    var newCount = items.filter(x=>!x.replied).length;
+    if(newCount>0){
+      $('supportBadge').textContent=newCount+' নতুন';
+      $('supportBadge').style.display='inline';
+    }
+    $('supportList').innerHTML = items.map(s=>`
+      <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:8px;border:2px solid ${s.replied?'var(--border)':'var(--p)'};">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <div style="font-weight:700;font-size:14px;flex:1;">${s.name}</div>
+          <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${s.replied?'rgba(48,209,88,.15)':'rgba(255,45,85,.2)'};color:${s.replied?'var(--green)':'var(--p)'};">${s.replied?'✓ replied':'🔴 নতুন'}</span>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">${s.email}</div>
-        <div style="font-size:12px;color:var(--text);margin-bottom:8px;">"${(s.lastMsg||'').substring(0,80)}${(s.lastMsg||'').length>80?'...':''}"</div>
-        <button class="btn-s" onclick="openReply('${s.uid}','${s.name||'—'}','${s.email}')" style="width:100%;font-size:12px;">💬 বার্তা দেখো ও Reply করো</button>
+        <div style="font-size:12px;background:var(--bg2);padding:8px;border-radius:6px;margin-bottom:8px;">"${(s.lastMsg||'').substring(0,100)}"</div>
+        <button class="btn-s" onclick="openReply('${s.uid}','${s.name}','${s.email}')" style="width:100%;">💬 দেখো ও Reply করো (${s.msgs.length} বার্তা)</button>
       </div>`).join('');
-  } catch(e){ $('supportList').innerHTML='<div style="color:var(--p);font-size:12px;padding:10px;">Error: '+e.message+'</div>'; }
+  }catch(e){
+    $('supportList').innerHTML='<div style="color:var(--p);font-size:12px;padding:10px;">Error: '+e.message+'</div>';
+  }
 }
 
 async function openReply(uid, name, email){
@@ -688,50 +700,90 @@ async function openReply(uid, name, email){
   $('replyUserName').textContent = name;
   $('replyUserEmail').textContent = email;
   $('replyModal').style.display = 'flex';
-  var d = await getSetting('support_'+uid);
-  var msgs = (d && Array.isArray(d.msgs)) ? d.msgs : [];
-  $('replyMsgList').innerHTML = msgs.map(m=>`
-    <div style="margin-bottom:8px;display:flex;flex-direction:column;align-items:${m.from==='user'?'flex-start':'flex-end'};">
-      <div style="max-width:85%;background:${m.from==='user'?'var(--bg2)':'var(--p)'};color:${m.from==='user'?'var(--text)':'#fff'};border-radius:10px;padding:8px 12px;font-size:12px;">${m.text}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px;">${m.from==='user'?name:'👑 Admin'} • ${m.time||''}</div>
-    </div>`).join('');
-  $('replyMsgList').scrollTop=$('replyMsgList').scrollHeight;
+  $('replyMsgList').innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px;">লোড হচ্ছে...</div>';
+  try{
+    var d = await getSetting('support_'+uid) || {};
+    var msgs = [];
+    if(d.msgs){
+      try{ msgs = typeof d.msgs==='string' ? JSON.parse(d.msgs) : d.msgs; }catch(e){ msgs=[]; }
+    }
+    if(!Array.isArray(msgs)) msgs = [];
+    if(!msgs.length){
+      $('replyMsgList').innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px;">কোনো বার্তা নেই</div>';
+    } else {
+      $('replyMsgList').innerHTML = msgs.map(m=>`
+        <div style="margin-bottom:10px;display:flex;flex-direction:column;align-items:${m.from==='user'?'flex-start':'flex-end'};">
+          <div style="max-width:85%;background:${m.from==='user'?'var(--bg2)':'var(--p)'};color:${m.from==='user'?'var(--text)':'#fff'};border-radius:${m.from==='user'?'4px 12px 12px 12px':'12px 4px 12px 12px'};padding:10px 14px;font-size:13px;line-height:1.6;">${m.text}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px;">${m.from==='user'?name:'👑 Admin'} • ${m.time||''}</div>
+        </div>`).join('');
+      $('replyMsgList').scrollTop = $('replyMsgList').scrollHeight;
+    }
+  }catch(e){
+    $('replyMsgList').innerHTML='<div style="color:var(--p);font-size:12px;padding:10px;">Error: '+e.message+'</div>';
+  }
 }
-function closeReply(){ $('replyModal').style.display='none'; $('replyTxt').value=''; currentSupportUid=''; }
+
+function closeReply(){
+  $('replyModal').style.display='none';
+  $('replyTxt').value='';
+  currentSupportUid='';
+}
 
 async function sendReply(){
-  var txt=$('replyTxt').value.trim();
-  if(!txt||!currentSupportUid){ toast('Reply লেখো!','er'); return; }
-  load('পাঠানো হচ্ছে...');
+  var txt = $('replyTxt').value.trim();
+  if(!txt || !currentSupportUid){ toast('Reply লেখো!','er'); return; }
+  load('Reply পাঠানো হচ্ছে...');
   try{
+    // আগের data load করো
     var d = await getSetting('support_'+currentSupportUid) || {};
-    var msgs = Array.isArray(d.msgs) ? d.msgs : [];
-    msgs.push({from:'admin', text:txt, time:new Date().toLocaleString('bn-BD')});
-    await saveSetting('support_'+currentSupportUid, {
-      msgs: msgs,
-      uid: d.uid||currentSupportUid,
-      email: d.email||'',
-      name: d.name||'',
-      lastMsg: d.lastMsg||'',
-      lastTime: d.lastTime||'',
-      replied: true
+    var msgs = [];
+    if(d.msgs){
+      try{ msgs = typeof d.msgs==='string' ? JSON.parse(d.msgs) : d.msgs; }catch(e){ msgs=[]; }
+    }
+    if(!Array.isArray(msgs)) msgs = [];
+    
+    // নতুন admin reply যোগ করো
+    msgs.push({
+      from: 'admin',
+      text: txt,
+      time: new Date().toLocaleString('bn-BD')
     });
+    
+    // save করো — msgs কে JSON string হিসেবে
+    await fsSet('settings', 'support_'+currentSupportUid, {
+      msgs:      JSON.stringify(msgs),
+      uid:       d.uid || currentSupportUid,
+      email:     d.email || '',
+      name:      d.name || '',
+      lastMsg:   d.lastMsg || '',
+      lastTime:  d.lastTime || '',
+      replied:   true
+    });
+    
     unload();
     $('replyTxt').value='';
     toast('✅ Reply পাঠানো হয়েছে!','ok');
+    // refresh
     openReply(currentSupportUid, $('replyUserName').textContent, $('replyUserEmail').textContent);
     loadSupportMsgs();
-  } catch(e){ unload(); toast('❌ '+e.message,'er'); }
+  }catch(e){
+    unload();
+    toast('❌ Error: '+e.message,'er');
+  }
 }
-
 /* ── Notices ── */
 var noticesData = [];
 async function loadNotices(){
   try{
-    var d = await getSetting('notices');
-    noticesData = d?.list || [];
+    var d = await fsGet('settings','notices');
+    if(!d){ noticesData=[]; renderNoticeAdmList(); return; }
+    // list JSON parse
+    if(d.list){
+      try{ noticesData = typeof d.list==='string' ? JSON.parse(d.list) : d.list; }
+      catch(e){ noticesData=[]; }
+    } else { noticesData=[]; }
     renderNoticeAdmList();
-  } catch(e){}
+  } catch(e){ noticesData=[]; renderNoticeAdmList(); }
 }
 function renderNoticeAdmList(){
   $('noticeAdmList').innerHTML = noticesData.length ? noticesData.map((n,i)=>`
@@ -759,7 +811,8 @@ async function addNotice(){
   };
   noticesData.unshift(notice); // নতুনটা সবার উপরে
   load('সেভ হচ্ছে...');
-  await saveSetting('notices', {list: noticesData});
+  // list array কে JSON string হিসেবে save করো
+  await fsSet('settings', 'notices', {list: JSON.stringify(noticesData)});
   unload();
   // form clear
   ['nTitle','nBody','nLink','nLinkText','nFileUrl','nFileName'].forEach(id=>$(id).value='');
@@ -771,7 +824,7 @@ async function delNotice(i){
   if(!confirm('এই নোটিশ মুছবে?')) return;
   noticesData.splice(i,1);
   load('মুছা হচ্ছে...');
-  await saveSetting('notices', {list: noticesData});
+  await fsSet('settings', 'notices', {list: JSON.stringify(noticesData)});
   unload(); renderNoticeAdmList();
   toast('🗑️ মুছে গেছে!','ok');
 }
