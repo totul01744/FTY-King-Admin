@@ -651,19 +651,19 @@ async function loadSupportMsgs(){
     for(var doc of docs){
       // document name এ support_ আছে কিনা
       if(doc.name && doc.name.includes('/support_')){
-        var data = fF(doc);
-        if(data && data.lastMsg){
+        var data = frFS(doc);
+        if(data && (data.lastMsg || data.msgs)){
           // msgs parse
           var msgs = [];
           if(data.msgs){
-            try{ msgs = typeof data.msgs==='string' ? JSON.parse(data.msgs) : data.msgs; }catch(e){ msgs=[]; }
+            try{ msgs = typeof data.msgs==='string' ? JSON.parse(data.msgs) : (Array.isArray(data.msgs) ? data.msgs : []); }catch(e){ msgs=[]; }
           }
           items.push({
-            uid: data.uid||'',
+            uid: data.uid || doc.name.split('/support_')[1] || '',
             name: data.name||'—',
             email: data.email||'—',
-            lastMsg: data.lastMsg||'',
-            replied: data.replied||false,
+            lastMsg: data.lastMsg || (msgs.length ? msgs[msgs.length-1].text : ''),
+            replied: data.replied==='true'||data.replied===true,
             msgs: msgs
           });
         }
@@ -705,7 +705,11 @@ async function openReply(uid, name, email){
     var d = await getSetting('support_'+uid) || {};
     var msgs = [];
     if(d.msgs){
-      try{ msgs = typeof d.msgs==='string' ? JSON.parse(d.msgs) : d.msgs; }catch(e){ msgs=[]; }
+      try{
+        if(typeof d.msgs==='string') msgs = JSON.parse(d.msgs);
+        else if(Array.isArray(d.msgs)) msgs = d.msgs;
+        else msgs = [];
+      }catch(e){ msgs=[]; }
     }
     if(!Array.isArray(msgs)) msgs = [];
     if(!msgs.length){
@@ -738,7 +742,11 @@ async function sendReply(){
     var d = await getSetting('support_'+currentSupportUid) || {};
     var msgs = [];
     if(d.msgs){
-      try{ msgs = typeof d.msgs==='string' ? JSON.parse(d.msgs) : d.msgs; }catch(e){ msgs=[]; }
+      try{
+        if(typeof d.msgs==='string') msgs = JSON.parse(d.msgs);
+        else if(Array.isArray(d.msgs)) msgs = d.msgs;
+        else msgs = [];
+      }catch(e){ msgs=[]; }
     }
     if(!Array.isArray(msgs)) msgs = [];
     
