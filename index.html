@@ -177,7 +177,11 @@ select.fi2{cursor:pointer;}
       <div class="sec-body">
         <input type="hidden" id="editIdx" value="-1">
         <div class="grid2">
-          <div class="fg"><label class="fl">দিন নম্বর</label><input type="number" class="fi2" id="fDay" min="1" max="60"></div>
+          <div class="fg">
+  <label class="fl">দিন নম্বর (১-৬০)</label>
+  <select class="fi2" id="fDay">
+    <option value="">-- দিন বেছে নাও --</option><option value="1">দিন 1</option><option value="2">দিন 2</option><option value="3">দিন 3</option><option value="4">দিন 4</option><option value="5">দিন 5</option><option value="6">দিন 6</option><option value="7">দিন 7</option><option value="8">দিন 8</option><option value="9">দিন 9</option><option value="10">দিন 10</option><option value="11">দিন 11</option><option value="12">দিন 12</option><option value="13">দিন 13</option><option value="14">দিন 14</option><option value="15">দিন 15</option><option value="16">দিন 16</option><option value="17">দিন 17</option><option value="18">দিন 18</option><option value="19">দিন 19</option><option value="20">দিন 20</option><option value="21">দিন 21</option><option value="22">দিন 22</option><option value="23">দিন 23</option><option value="24">দিন 24</option><option value="25">দিন 25</option><option value="26">দিন 26</option><option value="27">দিন 27</option><option value="28">দিন 28</option><option value="29">দিন 29</option><option value="30">দিন 30</option><option value="31">দিন 31</option><option value="32">দিন 32</option><option value="33">দিন 33</option><option value="34">দিন 34</option><option value="35">দিন 35</option><option value="36">দিন 36</option><option value="37">দিন 37</option><option value="38">দিন 38</option><option value="39">দিন 39</option><option value="40">দিন 40</option><option value="41">দিন 41</option><option value="42">দিন 42</option><option value="43">দিন 43</option><option value="44">দিন 44</option><option value="45">দিন 45</option><option value="46">দিন 46</option><option value="47">দিন 47</option><option value="48">দিন 48</option><option value="49">দিন 49</option><option value="50">দিন 50</option><option value="51">দিন 51</option><option value="52">দিন 52</option><option value="53">দিন 53</option><option value="54">দিন 54</option><option value="55">দিন 55</option><option value="56">দিন 56</option><option value="57">দিন 57</option><option value="58">দিন 58</option><option value="59">দিন 59</option><option value="60">দিন 60</option></select>
+</div>
           <div class="fg"><label class="fl">Emoji</label><input class="fi2" id="fEmoji"></div>
         </div>
         <div class="fg"><label class="fl">চ্যালেঞ্জ নাম</label><input class="fi2" id="fTitle"></div>
@@ -300,21 +304,6 @@ select.fi2{cursor:pointer;}
       </div>
     </div>
 
-    <!-- Payment Settings -->
-    <div class="sec">
-      <div class="sec-hdr" onclick="togSec(this)">💳 পেমেন্ট সেটিংস <span style="margin-left:auto;color:var(--muted)">▼</span></div>
-      <div class="sec-body">
-        <div class="grid2">
-          <div class="fg"><label class="fl">bKash নম্বর</label><input class="fi2" id="fBkash"></div>
-          <div class="fg"><label class="fl">Nagad নম্বর</label><input class="fi2" id="fNagad"></div>
-          <div class="fg"><label class="fl">Tier 1 মূল্য</label><input type="number" class="fi2" id="fP1" placeholder="499"></div>
-          <div class="fg"><label class="fl">Tier 2 মূল্য</label><input type="number" class="fi2" id="fP2" placeholder="799"></div>
-        </div>
-        <div class="fg"><label class="fl">Admin Telegram</label><input class="fi2" id="fTG" placeholder="@admin"></div>
-        <button class="btn-p" onclick="savePaySettings()">💾 সেভ করো</button>
-      </div>
-    </div>
-
     <!-- Password change -->
     <div class="sec">
       <div class="sec-hdr" onclick="togSec(this)">🔐 Admin Password <span style="margin-left:auto;color:var(--muted)">▼</span></div>
@@ -419,7 +408,12 @@ async function saveSetting(key,val){
   await fsSet('settings', key, saveData);
 }
 async function getChallenges(){
-  var d=await getSetting('challenges'); return d?.list||[];
+  var d = await fsGet('settings','challenges');
+  if(!d || !d.list) return [];
+  try{
+    var list = typeof d.list==='string' ? JSON.parse(d.list) : d.list;
+    return Array.isArray(list) ? list : [];
+  }catch(e){ return []; }
 }
 
 /* ── Login ── */
@@ -451,7 +445,6 @@ async function showPanel(){
   try{
     challenges=await getChallenges();
     renderChalList();
-    var pay=await getSetting('payment'); if(pay){ $('fBkash').value=pay.bkash||''; $('fNagad').value=pay.nagad||''; $('fP1').value=pay.price1||499; $('fP2').value=pay.price2||799; $('fTG').value=pay.adminTG||''; }
     var eLinks=await getSetting('earningLinks');
     if(eLinks){ $('eFtyGame').value=eLinks.ftyGame||$('eFtyGame').value; $('eEveryday').value=eLinks.everydayTask||$('eEveryday').value; $('eBusiness').value=eLinks.startBusiness||$('eBusiness').value; }
     $('stChals').textContent=challenges.length;
@@ -562,14 +555,14 @@ async function saveChallenge(){
   if(idx>=0) challenges[idx]=ch;
   else{ var ei=challenges.findIndex(x=>x.day===ch.day); if(ei>=0) challenges[ei]=ch; else{ challenges.push(ch); challenges.sort((a,b)=>a.day-b.day); } }
   load('সেভ হচ্ছে...');
-  await saveSetting('challenges',{list:challenges});
+  await fsSet('settings','challenges',{list:JSON.stringify(challenges)});
   unload(); clearForm(); renderChalList(); $('stChals').textContent=challenges.length;
-  toast('✅ সেভ হয়েছে!','ok');
+  toast('✅ চ্যালেঞ্জ সেভ হয়েছে!','ok');
 }
 function editChal(i){
   var c=challenges[i]; if(!c) return;
   $('editIdx').value=i;
-  $('fDay').value=c.day; $('fTitle').value=c.title; $('fEmoji').value=c.emoji||''; $('fDesc').value=c.description||''; $('fTier').value=c.tier;
+  $('fDay').value=String(c.day); $('fTitle').value=c.title; $('fEmoji').value=c.emoji||''; $('fDesc').value=c.description||''; $('fTier').value=c.tier;
   $('fBg').value=c.location?.background||''; $('fCam').value=c.location?.camera||''; $('fLight').value=c.location?.lighting||''; $('fShot').value=c.location?.shotType||'';
   $('fBTop').value=c.outfitBoy?.top||''; $('fBBot').value=c.outfitBoy?.bottom||''; $('fBShoe').value=c.outfitBoy?.shoes||''; $('fBAcc').value=c.outfitBoy?.accessories||'';
   $('fGTop').value=c.outfitGirl?.top||''; $('fGBot').value=c.outfitGirl?.bottom||''; $('fGShoe').value=c.outfitGirl?.shoes||''; $('fGMakeup').value=c.outfitGirl?.makeup||''; $('fGAcc').value=c.outfitGirl?.accessories||'';
@@ -585,7 +578,7 @@ function editChal(i){
 async function delChal(i){
   if(!confirm('মুছবে?')) return;
   challenges.splice(i,1); load('মুছা হচ্ছে...');
-  await saveSetting('challenges',{list:challenges});
+  await fsSet('settings','challenges',{list:JSON.stringify(challenges)});
   unload(); renderChalList(); toast('🗑️ মুছে গেছে!','ok');
 }
 function clearForm(){
@@ -594,12 +587,7 @@ function clearForm(){
   $('fTier').value='free';
 }
 
-/* ── Payment Settings ── */
-async function savePaySettings(){
-  var s={bkash:$('fBkash').value,nagad:$('fNagad').value,price1:parseInt($('fP1').value)||499,price2:parseInt($('fP2').value)||799,adminTG:$('fTG').value};
-  load('সেভ হচ্ছে...'); await saveSetting('payment',s);
-  unload(); toast('✅ সেভ হয়েছে!','ok');
-}
+
 
 
 
