@@ -423,7 +423,12 @@ async function fsGet(col,id){ var r=await fetch(FSURL+col+'/'+id,{headers:fsh()}
 async function fsSet(col,id,data){ await fetch(FSURL+col+'/'+id,{method:'PATCH',headers:fsh(),body:JSON.stringify(toFS(data))}); }
 async function fsUpdate(col,id,data){
   var keys=Object.keys(data).join('&updateMask.fieldPaths=');
-  await fetch(FSURL+col+'/'+id+'?updateMask.fieldPaths='+keys,{method:'PATCH',headers:fsh(),body:JSON.stringify(toFS(data))});
+  var r=await fetch(FSURL+col+'/'+id+'?updateMask.fieldPaths='+keys,{method:'PATCH',headers:fsh(),body:JSON.stringify(toFS(data))});
+  if(!r.ok){
+    var ed=await r.json().catch(function(){return{};});
+    throw new Error((ed.error&&ed.error.message)||'HTTP '+r.status);
+  }
+  return r;
 }
 async function getAllUsers(){
   var r=await fetch(FSURL+'users',{headers:fsh()}); var d=await r.json();
@@ -552,10 +557,30 @@ function renderUsers(users){
   :'<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px;">কোনো ইউজার নেই</div>';
 }
 async function delUser(uid,email){
-  if(!confirm(email+' এর ডেটা মুছবে?')) return;
+  if(!confirm((email||uid)+' এর সব ডেটা মুছবে?')) return;
   load('মুছা হচ্ছে...');
-  await fetch(FSURL+'users/'+uid,{method:'DELETE',headers:fsh()});
-  unload(); toast('🗑️ মুছে গেছে!','ok'); loadUsers();
+  try{
+    var r=await fetch(FSURL+'users/'+uid,{method:'DELETE',headers:fsh()});
+    if(!r.ok && r.status!==404){
+      var ed=await r.json().catch(function(){return{};});
+      throw new Error((ed.error&&ed.error.message)||'HTTP '+r.status);
+    }
+    // Local array থেকে বাদ দাও
+    allUsers=allUsers.filter(function(u){return u.uid!==uid;});
+    unload();
+    toast('🗑️ মুছে গেছে!','ok');
+    // UI immediately update
+    renderUsers(allUsers);
+    // Stats update
+    if($('stTotal')) $('stTotal').textContent=allUsers.length;
+    if($('stPending')) $('stPending').textContent=allUsers.filter(function(u){return !u.approved&&!u.isAdmin;}).length;
+  }catch(e){
+    unload();
+    toast('❌ মুছতে পারিনি: '+e.message,'er');
+    console.error('delUser error:',e);
+    // Fresh load করো
+    loadUsers();
+  }
 }
 
 async function approveUser(uid, name){
@@ -568,8 +593,8 @@ async function approveUser(uid, name){
     var u = allUsers.find(function(x){ return x.uid===uid; });
     if(u) u.approved = true;
     unload();
-    toast('✅ '+(name||uid)+' অ্যাপ্রুভড! এখন সে app এ ঢুকতে পারবে।','ok');
-    renderUsers(allUsers); // loadUsers না করে renderUsers — faster
+    toast('✅ '+(name||uid)+' অ্যাপ্রুভড!','ok');
+    await loadUsers(); // Fresh data নিয়ে render — বাটন সাথে সাথে বদলাবে
   }catch(e){ unload(); toast('❌ Error: '+e.message,'er'); console.error(e); }
 }
 
@@ -581,8 +606,8 @@ async function revokeUser(uid, name){
     var u = allUsers.find(function(x){ return x.uid===uid; });
     if(u) u.approved = false;
     unload();
-    toast('🔒 '+(name||uid)+' এর অ্যাক্সেস বাতিল হয়েছে।','ok');
-    renderUsers(allUsers);
+    toast('🔒 '+(name||uid)+' এর অ্যাক্সেস বাতিল।','ok');
+    await loadUsers();
   }catch(e){ unload(); toast('❌ Error: '+e.message,'er'); console.error(e); }
 }
 
